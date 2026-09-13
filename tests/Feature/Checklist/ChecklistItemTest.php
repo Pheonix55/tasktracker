@@ -9,10 +9,21 @@ test('a checklist item can be added to a task', function () {
 
     Livewire::test('checklist.manager', ['task' => $task])
         ->set('newItemLabel', 'Write tests')
-        ->call('add')
-        ->assertDispatched('task-updated');
+        ->call('add');
 
     expect($task->checklistItems()->where('label', 'Write tests')->exists())->toBeTrue();
+});
+
+test('comma-separated input adds multiple checklist items to a task', function () {
+    $task = Task::factory()->create();
+
+    Livewire::test('checklist.manager', ['task' => $task])
+        ->set('newItemLabel', 'Write tests, Update docs,  Ship it ,')
+        ->call('add');
+
+    $labels = $task->checklistItems()->orderBy('position')->pluck('label');
+
+    expect($labels)->toEqual(collect(['Write tests', 'Update docs', 'Ship it']));
 });
 
 test('a checklist item can be toggled complete', function () {
@@ -20,8 +31,7 @@ test('a checklist item can be toggled complete', function () {
     $item = ChecklistItem::factory()->create(['task_id' => $task->id, 'is_completed' => false]);
 
     Livewire::test('checklist.manager', ['task' => $task])
-        ->call('toggle', $item->id)
-        ->assertDispatched('task-updated');
+        ->call('toggle', $item->id);
 
     expect($item->fresh()->is_completed)->toBeTrue();
 });

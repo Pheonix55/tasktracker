@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Tag;
 use App\Models\Task;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -23,6 +24,13 @@ class extends Component
      * @var list<int>
      */
     public array $tagFilter = [];
+
+    /**
+     * Priority values used to filter the board. Empty means no filtering.
+     *
+     * @var list<string>
+     */
+    public array $priorityFilter = [];
 
     /**
      * Per-column quick-add title input, keyed by status value.
@@ -65,7 +73,17 @@ class extends Component
             $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->tagFilter));
         }
 
+        if (! empty($this->priorityFilter)) {
+            $query->whereIn('priority', $this->priorityFilter);
+        }
+
         return $query->get()->groupBy(fn (Task $task) => $task->status->value);
+    }
+
+    #[Computed]
+    public function priorityOptions(): array
+    {
+        return TaskPriority::cases();
     }
 
     public function toggleTagFilter(int $tagId): void
@@ -74,6 +92,15 @@ class extends Component
             $this->tagFilter = array_values(array_diff($this->tagFilter, [$tagId]));
         } else {
             $this->tagFilter[] = $tagId;
+        }
+    }
+
+    public function togglePriorityFilter(string $priority): void
+    {
+        if (in_array($priority, $this->priorityFilter, true)) {
+            $this->priorityFilter = array_values(array_diff($this->priorityFilter, [$priority]));
+        } else {
+            $this->priorityFilter[] = $priority;
         }
     }
 
@@ -96,25 +123,46 @@ class extends Component
 
     public function quickAdd(string $status): void
     {
-        $title = trim($this->newTaskTitle[$status] ?? '');
+        $titles = $this->splitCommaSeparated($this->newTaskTitle[$status] ?? '');
 
-        if ($title === '') {
+        if ($titles === []) {
             return;
         }
 
         $status = TaskStatus::from($status);
 
         $position = $this->project->tasks()->where('status', $status)->max('position');
+        $position = $position === null ? 0 : $position + 1;
 
-        $this->project->tasks()->create([
-            'title' => $title,
-            'status' => $status,
-            'priority' => TaskPriority::Medium,
-            'position' => $position === null ? 0 : $position + 1,
-        ]);
+        foreach ($titles as $title) {
+            $this->project->tasks()->create([
+                'title' => $title,
+                'status' => $status,
+                'priority' => TaskPriority::Medium,
+                'position' => $position,
+            ]);
+
+            $position++;
+        }
 
         $this->newTaskTitle[$status->value] = '';
         unset($this->tasksByStatus);
+    }
+
+    /**
+     * Split a comma-separated string into a list of trimmed, non-empty values,
+     * each truncated to fit the `title`/`label` column length.
+     *
+     * @return list<string>
+     */
+    private function splitCommaSeparated(string $value): array
+    {
+        return collect(explode(',', $value))
+            ->map(fn (string $part): string => trim($part))
+            ->filter(fn (string $part): bool => $part !== '')
+            ->map(fn (string $part): string => Str::limit($part, 255, ''))
+            ->values()
+            ->all();
     }
 
     public function handleSort(int $id, int $position, string $status): void

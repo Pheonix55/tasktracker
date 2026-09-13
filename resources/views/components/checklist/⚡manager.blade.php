@@ -2,6 +2,7 @@
 
 use App\Models\ChecklistItem;
 use App\Models\Task;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 new class extends Component
@@ -18,17 +19,32 @@ new class extends Component
     public function add(): void
     {
         $this->validate([
-            'newItemLabel' => ['required', 'string', 'max:255'],
+            'newItemLabel' => ['required', 'string', 'max:2000'],
         ]);
 
-        $this->task->checklistItems()->create([
-            'label' => $this->newItemLabel,
-            'position' => $this->task->checklistItems()->count(),
-        ]);
+        $labels = collect(explode(',', $this->newItemLabel))
+            ->map(fn (string $label): string => trim($label))
+            ->filter(fn (string $label): bool => $label !== '')
+            ->map(fn (string $label): string => Str::limit($label, 255, ''))
+            ->values();
+
+        if ($labels->isEmpty()) {
+            return;
+        }
+
+        $position = $this->task->checklistItems()->count();
+
+        foreach ($labels as $label) {
+            $this->task->checklistItems()->create([
+                'label' => $label,
+                'position' => $position,
+            ]);
+
+            $position++;
+        }
 
         $this->newItemLabel = '';
         $this->task->load('checklistItems');
-        $this->dispatch('task-updated');
     }
 
     public function toggle(int $itemId): void
@@ -37,7 +53,6 @@ new class extends Component
         $item->update(['is_completed' => ! $item->is_completed]);
 
         $this->task->load('checklistItems');
-        $this->dispatch('task-updated');
     }
 
     public function remove(int $itemId): void
@@ -45,7 +60,6 @@ new class extends Component
         $this->task->checklistItems()->findOrFail($itemId)->delete();
 
         $this->task->load('checklistItems');
-        $this->dispatch('task-updated');
     }
 
     public function handleSort(int $id, int $position): void
@@ -62,7 +76,6 @@ new class extends Component
         }
 
         $this->task->load('checklistItems');
-        $this->dispatch('task-updated');
     }
 };
 ?>
@@ -109,12 +122,13 @@ new class extends Component
     </ul>
 
     <form wire:submit="add" class="flex items-center gap-2">
-        <input
-            type="text"
+        <textarea
             wire:model="newItemLabel"
-            placeholder="Add checklist item..."
-            class="flex-1 rounded-md border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53003]/40 data-loading:opacity-50"
-        >
+            wire:keydown.enter.prevent="add"
+            rows="1"
+            placeholder="Add checklist items (comma-separated)..."
+            class="flex-1 resize-none rounded-md border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53003]/40 data-loading:opacity-50"
+        ></textarea>
         <button type="submit" wire:loading.attr="disabled" wire:target="add" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-[#1b1b18] dark:bg-[#eeeeec] text-white dark:text-[#1C1C1A] hover:bg-black dark:hover:bg-white data-loading:opacity-70">
             <x-heroicon-o-arrow-path wire:loading wire:target="add" class="w-3.5 h-3.5 animate-spin" />
             Add

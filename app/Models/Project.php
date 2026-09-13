@@ -54,6 +54,16 @@ class Project extends Model
     }
 
     /**
+     * The sticky notes scoped to this project (excludes general notes).
+     *
+     * @return HasMany<Note, $this>
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(Note::class);
+    }
+
+    /**
      * Percentage of the project's tasks that are done, rounded to the nearest whole percent.
      */
     public function completionPercentage(): int

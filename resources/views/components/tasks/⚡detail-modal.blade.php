@@ -44,6 +44,11 @@ new class extends Component
     {
         $this->show = false;
         $this->taskId = null;
+
+        // Checklist/tag edits made while the panel was open don't refresh the
+        // board or dashboard live (that would mean a round trip per click);
+        // catch them up now that the task is no longer being edited.
+        $this->dispatch('task-updated');
     }
 
     #[Computed]

@@ -27,7 +27,6 @@ new class extends Component
     {
         $this->task->tags()->toggle($tagId);
         $this->task->load('tags');
-        $this->dispatch('task-updated');
     }
 
     public function createTag(): void
@@ -46,7 +45,6 @@ new class extends Component
         $this->task->tags()->attach($tag->id);
         $this->task->load('tags');
         $this->newTagName = '';
-        $this->dispatch('task-updated');
     }
 };
 ?>

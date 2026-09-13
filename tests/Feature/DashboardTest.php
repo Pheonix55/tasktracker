@@ -39,3 +39,31 @@ test('a task in a trashed project is excluded from dashboard counts', function (
 
     expect(Livewire::test('pages::dashboard')->instance()->openTaskCount)->toBe(0);
 });
+
+test('generating today\'s summary mentions due-today, overdue, and completed-today tasks', function () {
+    $project = Project::factory()->create();
+
+    Task::factory()->create(['project_id' => $project->id, 'title' => 'Due Today Task', 'status' => TaskStatus::Todo, 'due_date' => now()]);
+    Task::factory()->create(['project_id' => $project->id, 'title' => 'Overdue Task', 'status' => TaskStatus::Todo, 'due_date' => now()->subDay()]);
+    Task::factory()->create(['project_id' => $project->id, 'title' => 'Completed Task', 'status' => TaskStatus::Done, 'completed_at' => now()]);
+
+    Livewire::test('pages::dashboard')
+        ->call('generateTodaySummary')
+        ->assertSet('todaySummary', fn (string $summary) => str_contains($summary, 'Due Today Task'))
+        ->assertSet('todaySummary', fn (string $summary) => str_contains($summary, 'Overdue Task'))
+        ->assertSet('todaySummary', fn (string $summary) => str_contains($summary, 'Completed Task'));
+});
+
+test('today\'s summary reports a calm day when nothing needs attention', function () {
+    Livewire::test('pages::dashboard')
+        ->call('generateTodaySummary')
+        ->assertSet('todaySummary', fn (string $summary) => str_contains($summary, 'Nothing needs your attention right now'));
+});
+
+test('today\'s summary is cleared when a task is updated', function () {
+    Livewire::test('pages::dashboard')
+        ->call('generateTodaySummary')
+        ->assertSet('todaySummary', fn (?string $summary) => $summary !== null)
+        ->dispatch('task-updated')
+        ->assertSet('todaySummary', null);
+});

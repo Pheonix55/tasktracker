@@ -38,6 +38,15 @@ test('a task can be updated from the detail modal', function () {
     expect($task->completed_at)->not->toBeNull();
 });
 
+test('closing the detail modal dispatches a board refresh', function () {
+    $task = Task::factory()->create();
+
+    Livewire::test('tasks.detail-modal')
+        ->call('open', $task->id)
+        ->call('close')
+        ->assertDispatched('task-updated');
+});
+
 test('the detail modal requires a title', function () {
     $task = Task::factory()->create();
 

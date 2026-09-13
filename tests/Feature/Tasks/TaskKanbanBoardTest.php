@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Tag;
@@ -37,6 +38,20 @@ test('the board can be filtered by tag', function () {
         ->assertDontSee('Untagged Task');
 });
 
+test('the board can be filtered by priority', function () {
+    $project = Project::factory()->create();
+
+    Task::factory()->create(['project_id' => $project->id, 'title' => 'High Priority Task', 'priority' => TaskPriority::High]);
+    Task::factory()->create(['project_id' => $project->id, 'title' => 'Low Priority Task', 'priority' => TaskPriority::Low]);
+
+    Livewire::test('pages::projects.show', ['project' => $project])
+        ->assertSee('High Priority Task')
+        ->assertSee('Low Priority Task')
+        ->call('togglePriorityFilter', TaskPriority::High->value)
+        ->assertSee('High Priority Task')
+        ->assertDontSee('Low Priority Task');
+});
+
 test('a task can be quick-added to a column', function () {
     $project = Project::factory()->create();
 
@@ -45,4 +60,16 @@ test('a task can be quick-added to a column', function () {
         ->call('quickAdd', 'todo');
 
     expect(Task::where('title', 'Write the release notes')->where('status', TaskStatus::Todo)->exists())->toBeTrue();
+});
+
+test('comma-separated input quick-adds multiple tasks to a column', function () {
+    $project = Project::factory()->create();
+
+    Livewire::test('pages::projects.show', ['project' => $project])
+        ->set('newTaskTitle.todo', 'Buy milk, Walk the dog,  Call mom ,')
+        ->call('quickAdd', 'todo');
+
+    $titles = Task::where('project_id', $project->id)->orderBy('position')->pluck('title');
+
+    expect($titles)->toEqual(collect(['Buy milk', 'Walk the dog', 'Call mom']));
 });
