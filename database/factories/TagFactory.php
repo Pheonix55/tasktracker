@@ -1,0 +1,42 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Tag;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends Factory<Tag>
+ */
+class TagFactory extends Factory
+{
+    /**
+     * The name of the factory's corresponding model.
+     *
+     * @var class-string<Tag>
+     */
+    protected $model = Tag::class;
+
+    /**
+     * A fixed palette so generated tags look intentional rather than random hex noise.
+     *
+     * @var list<string>
+     */
+    protected array $colors = [
+        '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
+        '#eab308', '#22c55e', '#10b981', '#06b6d4', '#3b82f6',
+    ];
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'name' => ucfirst($this->faker->unique()->word()),
+            'color' => $this->faker->randomElement($this->colors),
+        ];
+    }
+}
