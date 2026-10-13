@@ -50,8 +50,10 @@ new class extends Component
 ?>
 
 <div class="space-y-3">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-        <x-heroicon-o-tag class="w-4 h-4" />
+    <h3 class="flex items-center gap-2 text-sm font-semibold">
+        <span class="flex size-7 items-center justify-center rounded-lg bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-500/15 dark:text-fuchsia-400">
+            <x-heroicon-o-tag class="size-4" />
+        </span>
         Tags
     </h3>
 
@@ -62,14 +64,19 @@ new class extends Component
                 type="button"
                 wire:click="toggleTag({{ $tag->id }})"
                 wire:key="tag-picker-{{ $tag->id }}"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-colors data-loading:opacity-50 data-loading:pointer-events-none"
+                @class([
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 data-loading:pointer-events-none data-loading:opacity-50',
+                    'shadow-sm' => $attached,
+                    'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-white/10 dark:bg-transparent dark:text-zinc-400' => ! $attached,
+                ])
                 @style([
-                    "background-color: {$tag->color}22; color: {$tag->color}; border-color: {$tag->color}55;" => $attached,
-                    'border-color: #e3e3e0; color: #706f6c;' => ! $attached,
+                    "background-color: {$tag->color}1f; color: {$tag->color}; border-color: {$tag->color}66;" => $attached,
                 ])
             >
                 @if ($attached)
-                    <x-heroicon-o-check class="w-3 h-3" />
+                    <x-heroicon-m-check class="size-3" />
+                @else
+                    <span class="size-1.5 rounded-full" style="background-color: {{ $tag->color }};"></span>
                 @endif
                 {{ $tag->name }}
             </button>
@@ -81,12 +88,13 @@ new class extends Component
             type="text"
             wire:model="newTagName"
             placeholder="Create new tag..."
-            class="flex-1 rounded-md border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53003]/40 data-loading:opacity-50"
+            class="input-field flex-1 py-1.5 data-loading:opacity-50"
         >
-        <button type="submit" wire:loading.attr="disabled" wire:target="createTag" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-[#e3e3e0] dark:border-[#3E3E3A] data-loading:opacity-70">
-            <x-heroicon-o-arrow-path wire:loading wire:target="createTag" class="w-3.5 h-3.5 animate-spin" />
+        <button type="submit" wire:loading.attr="disabled" wire:target="createTag" class="btn-secondary px-3 py-1.5 data-loading:opacity-70">
+            <x-heroicon-o-plus wire:loading.remove wire:target="createTag" class="size-4" />
+            <x-heroicon-o-arrow-path wire:loading wire:target="createTag" class="size-4 animate-spin" />
             Add
         </button>
     </form>
-    @error('newTagName') <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+    @error('newTagName') <p class="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><x-heroicon-m-exclamation-circle class="size-3.5" />{{ $message }}</p> @enderror
 </div>

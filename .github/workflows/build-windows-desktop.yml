@@ -1,0 +1,173 @@
+name: Build Windows Desktop App
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Version for this build (e.g. 1.0.2) — sets NATIVEPHP_APP_VERSION"
+        required: true
+        type: string
+      publish:
+        description: "Publish the build to GitHub Releases (native:publish) instead of only building it (native:build)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    env:
+      # The auto-updater (and its GitHub publish target) is only wired in when a release repo is configured.
+      UPDATER_ENABLED: ${{ vars.RELEASE_REPO_OWNER != '' && vars.RELEASE_REPO_NAME != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
+          extensions: mbstring, xml, ctype, json, bcmath, fileinfo, tokenizer, curl, dom, pdo, pdo_sqlite, sqlite3, zip, gd, intl, openssl
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Cache Composer vendor
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Validate required secrets/variables are set
+        shell: bash
+        run: |
+          missing=()
+          [ -z "${{ secrets.APP_KEY }}" ] && missing+=("secrets.APP_KEY")
+          [ -z "${{ vars.NATIVEPHP_APP_ID }}" ] && missing+=("vars.NATIVEPHP_APP_ID")
+          if [ "${{ inputs.publish }}" = "true" ]; then
+            [ -z "${{ vars.RELEASE_REPO_OWNER }}" ] && missing+=("vars.RELEASE_REPO_OWNER")
+            [ -z "${{ vars.RELEASE_REPO_NAME }}" ] && missing+=("vars.RELEASE_REPO_NAME")
+            [ -z "${{ secrets.GH_UPDATER_TOKEN }}" ] && missing+=("secrets.GH_UPDATER_TOKEN")
+          fi
+          if [ "${{ vars.RELEASE_REPO_PRIVATE }}" = "true" ]; then
+            [ -z "${{ secrets.GH_TOKEN }}" ] && missing+=("secrets.GH_TOKEN")
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required Actions secrets/variables: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Write .env
+        shell: bash
+        run: |
+          cat > .env <<EOF
+          APP_NAME="${{ vars.APP_NAME || 'Task Tracker' }}"
+          APP_ENV=production
+          APP_KEY=${{ secrets.APP_KEY }}
+          APP_DEBUG=false
+          APP_URL=${{ vars.APP_URL || 'http://localhost:8000' }}
+
+          APP_LOCALE=en
+          APP_FALLBACK_LOCALE=en
+          APP_FAKER_LOCALE=en_US
+
+          APP_MAINTENANCE_DRIVER=file
+
+          LOG_CHANNEL=stack
+          LOG_STACK=single
+          LOG_LEVEL=${{ vars.LOG_LEVEL || 'error' }}
+
+          DB_CONNECTION=sqlite
+
+          SESSION_DRIVER=database
+          SESSION_LIFETIME=120
+          SESSION_ENCRYPT=false
+
+          BROADCAST_CONNECTION=log
+          FILESYSTEM_DISK=local
+          QUEUE_CONNECTION=database
+          CACHE_STORE=database
+
+          MAIL_MAILER=log
+
+          VITE_APP_NAME="${{ vars.APP_NAME || 'Task Tracker' }}"
+
+          NATIVEPHP_APP_ID=${{ vars.NATIVEPHP_APP_ID }}
+          NATIVEPHP_APP_VERSION=${{ inputs.app_version }}
+          NATIVEPHP_APP_AUTHOR="${{ vars.NATIVEPHP_APP_AUTHOR || 'Task Tracker' }}"
+          NATIVEPHP_APP_DESCRIPTION="${{ vars.NATIVEPHP_APP_DESCRIPTION || 'Offline task management app for tracking projects, tasks, and checklists.' }}"
+          NATIVEPHP_APP_COPYRIGHT="${{ vars.NATIVEPHP_APP_COPYRIGHT }}"
+          NATIVEPHP_APP_WEBSITE=${{ vars.NATIVEPHP_APP_WEBSITE }}
+          NATIVEPHP_DEEPLINK_SCHEME=${{ vars.NATIVEPHP_DEEPLINK_SCHEME }}
+          NATIVEPHP_NSIS_DELETE_APP_DATA=${{ vars.NATIVEPHP_NSIS_DELETE_APP_DATA || 'false' }}
+
+          NATIVEPHP_UPDATER_ENABLED=${{ env.UPDATER_ENABLED }}
+          NATIVEPHP_UPDATER_PROVIDER=github
+          GITHUB_OWNER=${{ vars.RELEASE_REPO_OWNER }}
+          GITHUB_REPO=${{ vars.RELEASE_REPO_NAME }}
+          GITHUB_PRIVATE=${{ vars.RELEASE_REPO_PRIVATE || 'false' }}
+          GITHUB_RELEASE_TYPE=${{ vars.RELEASE_TYPE || 'release' }}
+          GITHUB_AUTOUPDATE_TOKEN=${{ secrets.GH_TOKEN }}
+          EOF
+
+      - name: Install PHP dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install NativePHP resources
+        run: php artisan native:install --force --quiet
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Publish Windows desktop app
+        if: ${{ inputs.publish }}
+        env:
+          DEBUG: electron-builder
+          # electron-builder reads GH_TOKEN first; publishing needs the write token.
+          GH_TOKEN: ${{ secrets.GH_UPDATER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_UPDATER_TOKEN }}
+        run: php artisan native:publish win x64 --no-interaction
+
+      - name: Build Windows desktop app
+        if: ${{ !inputs.publish }}
+        run: php artisan native:build win x64 --no-interaction
+
+      # native:publish uploads the installer straight to the release, so there is nothing local to upload.
+      - name: Locate build output
+        id: locate
+        if: ${{ !inputs.publish }}
+        shell: bash
+        run: |
+          installer=$(find nativephp/electron/dist -maxdepth 1 -iname "*-setup.exe" | head -n 1)
+          if [ -z "$installer" ]; then
+            echo "::error::No *-setup.exe found under nativephp/electron/dist"
+            find nativephp -maxdepth 4
+            exit 1
+          fi
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+
+      - name: Upload installer artifact
+        if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tasktracker-windows-${{ inputs.app_version }}
+          path: ${{ steps.locate.outputs.installer }}
+          if-no-files-found: error
+          retention-days: 14

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Task;
@@ -51,4 +52,36 @@ test('sibling positions are re-sequenced within the destination column', functio
     expect($incoming->fresh())->status->toBe(TaskStatus::Todo)->position->toBe(0);
     expect($a->fresh()->position)->toBe(1);
     expect($b->fresh()->position)->toBe(2);
+});
+
+test('dropping a task while the board is filtered places it relative to the visible cards', function () {
+    $project = Project::factory()->create();
+
+    $hiddenFirst = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'priority' => TaskPriority::Low, 'position' => 0]);
+    $visible = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'priority' => TaskPriority::High, 'position' => 1]);
+    $hiddenLast = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'priority' => TaskPriority::Low, 'position' => 2]);
+    $incoming = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::InProgress, 'priority' => TaskPriority::High, 'position' => 0]);
+
+    Livewire::test('pages::projects.show', ['project' => $project])
+        ->call('togglePriorityFilter', TaskPriority::High->value)
+        ->call('handleSort', $incoming->id, 1, TaskStatus::Todo->value);
+
+    expect([$hiddenFirst, $visible, $incoming, $hiddenLast])
+        ->each(fn ($task, $index) => $task->fresh()->position->toBe($index));
+});
+
+test('dropping a task above the first visible card while filtered keeps hidden cards above it', function () {
+    $project = Project::factory()->create();
+
+    $hiddenFirst = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'priority' => TaskPriority::Low, 'position' => 0]);
+    $visible = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'priority' => TaskPriority::High, 'position' => 1]);
+    $incoming = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::InProgress, 'priority' => TaskPriority::High, 'position' => 0]);
+
+    Livewire::test('pages::projects.show', ['project' => $project])
+        ->call('togglePriorityFilter', TaskPriority::High->value)
+        ->call('handleSort', $incoming->id, 0, TaskStatus::Todo->value);
+
+    expect($hiddenFirst->fresh()->position)->toBe(0);
+    expect($incoming->fresh()->position)->toBe(1);
+    expect($visible->fresh()->position)->toBe(2);
 });

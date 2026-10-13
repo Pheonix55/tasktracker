@@ -53,123 +53,146 @@ new #[Layout('layouts::app')] #[Title('Projects')] class extends Component
 ?>
 
 <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h1 class="text-xl font-semibold">Projects</h1>
-            <p class="text-sm text-[#706f6c] dark:text-[#A1A09A] mt-1">Everything you're working on, organized into boards.</p>
-        </div>
+    <x-ui.page-header
+        title="Projects"
+        description="Everything you're working on, organized into boards."
+        icon="rectangle-stack"
+    >
+        <x-slot:actions>
+            <button type="button" wire:click="$dispatch('open-project-form')" class="btn-primary data-loading:opacity-70">
+                <x-heroicon-o-plus class="size-4" />
+                New Project
+            </button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
-        <button
-            type="button"
-            wire:click="$dispatch('open-project-form')"
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm bg-[#1b1b18] dark:bg-[#eeeeec] text-white dark:text-[#1C1C1A] hover:bg-black dark:hover:bg-white data-loading:opacity-70"
-        >
-            <x-heroicon-o-plus class="w-4 h-4" />
-            New Project
-        </button>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-3">
-        <div class="relative flex-1 min-w-[200px] max-w-sm">
-            <x-heroicon-o-magnifying-glass wire:loading.remove wire:target="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#a1a09a]" />
-            <x-heroicon-o-arrow-path wire:loading wire:target="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#a1a09a] animate-spin" />
+    <div class="flex flex-wrap items-center gap-4">
+        <div class="relative max-w-sm min-w-[220px] flex-1">
+            <x-heroicon-o-magnifying-glass wire:loading.remove wire:target="search" class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-zinc-400" />
+            <x-heroicon-o-arrow-path wire:loading wire:target="search" class="absolute top-1/2 left-3.5 size-4 -translate-y-1/2 animate-spin text-indigo-500" />
             <input
                 type="text"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Search projects..."
-                class="w-full rounded-md border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53003]/40"
+                class="input-field pl-10"
             >
         </div>
 
-        <label class="inline-flex items-center gap-2 text-sm text-[#706f6c] dark:text-[#A1A09A]">
-            <input type="checkbox" wire:model.live="showArchived" class="peer rounded border-[#e3e3e0] dark:border-[#3E3E3A] text-[#F53003] focus:ring-[#F53003]/40 data-loading:opacity-50">
-            <span class="peer-data-loading:opacity-50">Show archived</span>
+        <label class="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-zinc-600 select-none dark:text-zinc-400">
+            <span class="relative inline-flex">
+                <input type="checkbox" wire:model.live="showArchived" class="peer sr-only">
+                <span class="h-6 w-11 rounded-full bg-zinc-200 transition-colors duration-200 peer-checked:bg-linear-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500/50 peer-data-loading:opacity-50 dark:bg-zinc-700"></span>
+                <span class="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-md transition-transform duration-200 peer-checked:translate-x-5"></span>
+            </span>
+            Show archived
         </label>
     </div>
 
     <div wire:loading.remove wire:target="search, showArchived">
         @if ($this->projects->isEmpty())
-            <div class="rounded-lg border border-dashed border-[#e3e3e0] dark:border-[#3E3E3A] p-10 text-center">
-                <p class="text-sm text-[#a1a09a]">No projects found. Create your first one to get started.</p>
+            <div class="card border-dashed">
+                <x-ui.empty-state icon="folder-plus" title="No projects found." description="Create your first one to get started.">
+                    <button type="button" wire:click="$dispatch('open-project-form')" class="btn-primary mt-2">
+                        <x-heroicon-o-plus class="size-4" />
+                        New Project
+                    </button>
+                </x-ui.empty-state>
             </div>
         @else
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            @foreach ($this->projects as $project)
-                <div
-                    wire:key="project-{{ $project->id }}"
-                    x-data="{ navigating: false }"
-                    class="relative rounded-lg border border-[#e3e3e0] dark:border-[#3E3E3A] p-4 bg-white dark:bg-[#161615] flex flex-col gap-3 transition-colors hover:border-[#19140035] dark:hover:border-[#62605b]"
-                >
-                    <a
-                        href="{{ route('projects.show', $project) }}"
-                        wire:navigate
-                        @click="navigating = true"
-                        class="absolute inset-0 z-0 rounded-lg"
-                        aria-label="Open {{ $project->name }}"
-                    ></a>
-
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                @foreach ($this->projects as $project)
+                    @php $completion = $project->completionPercentage(); @endphp
                     <div
-                        x-show="navigating"
-                        x-cloak
-                        class="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-[#161615]/70 backdrop-blur-[1px]"
+                        wire:key="project-{{ $project->id }}"
+                        x-data="{ navigating: false }"
+                        class="card group relative flex animate-fade-in-up flex-col gap-4 overflow-hidden p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-zinc-900/5 dark:hover:border-white/20"
+                        style="animation-delay: {{ min($loop->index, 12) * 50 }}ms;"
                     >
-                        <x-heroicon-o-arrow-path class="w-5 h-5 animate-spin text-[#F53003] dark:text-[#FF4433]" />
-                    </div>
+                        <div class="pointer-events-none absolute inset-x-0 top-0 h-1 opacity-80 transition-opacity group-hover:opacity-100" style="background: linear-gradient(90deg, {{ $project->color }}, {{ $project->color }}33);"></div>
 
-                    <div class="relative z-10 flex items-start justify-between gap-2 pointer-events-none">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <span class="flex items-center justify-center w-10 h-10 rounded-lg text-white shrink-0" style="background-color: {{ $project->color }};">
-                                <x-dynamic-component :component="'heroicon-o-'.$project->icon" class="w-5 h-5" />
-                            </span>
-                            <span class="min-w-0">
-                                <span class="block font-medium truncate">{{ $project->name }}</span>
-                                <span class="block text-xs text-[#a1a09a]">{{ $project->tasks_count }} {{ $project->tasks_count === 1 ? 'task' : 'tasks' }}</span>
-                            </span>
-                        </div>
+                        <a
+                            href="{{ route('projects.show', $project) }}"
+                            wire:navigate
+                            @click="navigating = true"
+                            class="absolute inset-0 z-0 rounded-2xl"
+                            aria-label="Open {{ $project->name }}"
+                        ></a>
 
-                        <button
-                            type="button"
-                            wire:click="toggleFavorite({{ $project->id }})"
-                            class="relative z-10 shrink-0 pointer-events-auto text-[#a1a09a] hover:text-amber-500 data-loading:opacity-50 data-loading:pointer-events-none"
+                        <div
+                            x-show="navigating"
+                            x-cloak
+                            class="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-[2px] dark:bg-zinc-900/70"
                         >
-                            @if ($project->is_favorite)
-                                <x-heroicon-s-star class="w-5 h-5 text-amber-500" />
-                            @else
-                                <x-heroicon-o-star class="w-5 h-5" />
-                            @endif
-                        </button>
-                    </div>
+                            <x-heroicon-o-arrow-path class="size-6 animate-spin text-indigo-500" />
+                        </div>
 
-                    @if ($project->description)
-                        <p class="relative z-10 pointer-events-none text-sm text-[#706f6c] dark:text-[#A1A09A] line-clamp-2">{{ $project->description }}</p>
-                    @endif
+                        <div class="pointer-events-none relative z-10 flex items-start justify-between gap-2">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span class="flex size-11 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3" style="background: linear-gradient(135deg, {{ $project->color }}, {{ $project->color }}b3); box-shadow: 0 8px 20px -6px {{ $project->color }}80;">
+                                    <x-dynamic-component :component="'heroicon-o-'.$project->icon" class="size-5" />
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="flex items-center gap-2">
+                                        <span class="truncate font-semibold tracking-tight">{{ $project->name }}</span>
+                                        @if ($project->is_archived)
+                                            <span class="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-white/10 dark:text-zinc-400">Archived</span>
+                                        @endif
+                                    </span>
+                                    <span class="text-muted block text-xs">{{ $project->tasks_count }} {{ $project->tasks_count === 1 ? 'task' : 'tasks' }}</span>
+                                </span>
+                            </div>
 
-                    <div class="relative z-10 pointer-events-none w-full h-1.5 rounded-full bg-[#f0f0ef] dark:bg-[#232322] overflow-hidden">
-                        <div class="h-full rounded-full" style="width: {{ $project->completionPercentage() }}%; background-color: {{ $project->color }};"></div>
-                    </div>
-
-                    <div class="relative z-10 flex items-center justify-between pt-1 pointer-events-none">
-                        <span class="text-xs text-[#a1a09a]">{{ $project->completionPercentage() }}% complete</span>
-
-                        <div class="flex items-center gap-1 pointer-events-auto">
-                            <button type="button" wire:click="$dispatch('open-project-form', { projectId: {{ $project->id }} })" class="relative z-10 p-1.5 rounded-md text-[#706f6c] dark:text-[#A1A09A] hover:bg-[#f5f5f4] dark:hover:bg-[#1b1b1a] data-loading:opacity-50 data-loading:pointer-events-none">
-                                <x-heroicon-o-pencil-square class="w-4 h-4" />
+                            <button
+                                type="button"
+                                wire:click="toggleFavorite({{ $project->id }})"
+                                aria-label="{{ $project->is_favorite ? 'Remove from favorites' : 'Add to favorites' }}"
+                                title="{{ $project->is_favorite ? 'Remove from favorites' : 'Add to favorites' }}"
+                                class="btn-icon pointer-events-auto relative z-10 size-8 shrink-0 hover:text-amber-500 data-loading:pointer-events-none data-loading:opacity-50"
+                            >
+                                @if ($project->is_favorite)
+                                    <x-heroicon-s-star class="size-5 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
+                                @else
+                                    <x-heroicon-o-star class="size-5" />
+                                @endif
                             </button>
-                            <button type="button" wire:click="toggleArchive({{ $project->id }})" class="relative z-10 p-1.5 rounded-md text-[#706f6c] dark:text-[#A1A09A] hover:bg-[#f5f5f4] dark:hover:bg-[#1b1b1a] data-loading:opacity-50 data-loading:pointer-events-none">
-                                <x-heroicon-o-archive-box class="w-4 h-4" />
+                        </div>
+
+                        @if ($project->description)
+                            <p class="text-muted pointer-events-none relative z-10 line-clamp-2 text-sm">{{ $project->description }}</p>
+                        @endif
+
+                        <div class="pointer-events-none relative z-10 mt-auto space-y-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-muted">Progress</span>
+                                <span class="font-semibold tabular-nums">{{ $completion }}% complete</span>
+                            </div>
+                            <div class="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-white/10">
+                                <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{ $completion }}%; background: linear-gradient(90deg, {{ $project->color }}b3, {{ $project->color }});"></div>
+                            </div>
+                        </div>
+
+                        <div class="relative z-10 -mb-1 flex items-center justify-end gap-1 border-t border-zinc-100 pt-3 dark:border-white/5">
+                            <button type="button" wire:click="$dispatch('open-project-form', { projectId: {{ $project->id }} })" aria-label="Edit project" title="Edit" class="btn-icon size-8 data-loading:pointer-events-none data-loading:opacity-50">
+                                <x-heroicon-o-pencil-square class="size-4" />
                             </button>
-                            <button type="button" wire:click="moveToTrash({{ $project->id }})" wire:confirm="Move this project to the trash?" class="relative z-10 p-1.5 rounded-md text-red-600 dark:text-red-400 hover:bg-[#f5f5f4] dark:hover:bg-[#1b1b1a] data-loading:opacity-50 data-loading:pointer-events-none">
-                                <x-heroicon-o-trash class="w-4 h-4" />
+                            <button type="button" wire:click="toggleArchive({{ $project->id }})" aria-label="{{ $project->is_archived ? 'Unarchive project' : 'Archive project' }}" title="{{ $project->is_archived ? 'Unarchive' : 'Archive' }}" class="btn-icon size-8 data-loading:pointer-events-none data-loading:opacity-50">
+                                @if ($project->is_archived)
+                                    <x-heroicon-o-archive-box-arrow-down class="size-4" />
+                                @else
+                                    <x-heroicon-o-archive-box class="size-4" />
+                                @endif
+                            </button>
+                            <button type="button" wire:click="moveToTrash({{ $project->id }})" wire:confirm="Move this project to the trash?" aria-label="Move project to trash" title="Move to trash" class="btn-icon size-8 hover:bg-red-50 hover:text-red-600 data-loading:pointer-events-none data-loading:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-400">
+                                <x-heroicon-o-trash class="size-4" />
                             </button>
                         </div>
                     </div>
-                </div>
-            @endforeach
-        </div>
-    @endif
+                @endforeach
+            </div>
+        @endif
     </div>
 
-    <div wire:loading.grid wire:target="search, showArchived" class="hidden grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div wire:loading.grid wire:target="search, showArchived" class="hidden grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
         <x-ui.skeleton-project-card />
         <x-ui.skeleton-project-card />
         <x-ui.skeleton-project-card />

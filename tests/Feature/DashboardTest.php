@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Task;
@@ -66,4 +67,34 @@ test('today\'s summary is cleared when a task is updated', function () {
         ->assertSet('todaySummary', fn (?string $summary) => $summary !== null)
         ->dispatch('task-updated')
         ->assertSet('todaySummary', null);
+});
+
+test('tasks in an archived project are excluded from dashboard counts', function () {
+    $project = Project::factory()->archived()->create();
+    Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'due_date' => now()->subDay()]);
+    Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Done]);
+
+    $dashboard = Livewire::test('pages::dashboard')->instance();
+
+    expect($dashboard->openTaskCount)->toBe(0);
+    expect($dashboard->overdueTaskCount)->toBe(0);
+    expect($dashboard->completedTaskCount)->toBe(0);
+});
+
+test('today\'s summary lists tasks due today from highest to lowest priority', function () {
+    $project = Project::factory()->create();
+
+    foreach ([TaskPriority::Low, TaskPriority::High, TaskPriority::Medium, TaskPriority::Urgent] as $priority) {
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'title' => "{$priority->label()} Task",
+            'priority' => $priority,
+            'status' => TaskStatus::Todo,
+            'due_date' => today(),
+        ]);
+    }
+
+    Livewire::test('pages::dashboard')
+        ->call('generateTodaySummary')
+        ->assertSet('todaySummary', fn (string $summary) => str_contains($summary, 'Urgent Task, High Task, Medium Task and Low Task'));
 });

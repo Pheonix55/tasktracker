@@ -59,3 +59,23 @@ test('archived projects are hidden by default and shown when toggled', function 
         ->set('showArchived', true)
         ->assertSee('Retired Project');
 });
+
+test('the form rejects an icon outside the curated list', function () {
+    Livewire::test('projects.form-modal')
+        ->call('open')
+        ->set('name', 'New Website')
+        ->set('icon', 'not-a-real-icon')
+        ->call('save')
+        ->assertHasErrors(['icon' => 'in']);
+
+    expect(Project::count())->toBe(0);
+});
+
+test('saving the project form refreshes the open project board', function () {
+    $project = Project::factory()->create(['name' => 'Old Name']);
+    $board = Livewire::test('pages::projects.show', ['project' => $project]);
+
+    $project->update(['name' => 'Updated Name']);
+
+    $board->dispatch('project-saved')->assertSee('Updated Name');
+});

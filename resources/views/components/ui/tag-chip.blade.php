@@ -1,14 +1,15 @@
 @props(['tag', 'removable' => false])
 
 <span
-    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-    style="background-color: {{ $tag->color }}22; color: {{ $tag->color }};"
+    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
+    style="background-color: {{ $tag->color }}1a; color: {{ $tag->color }}; --tw-ring-color: {{ $tag->color }}40;"
 >
+    <span class="size-1.5 rounded-full" style="background-color: {{ $tag->color }};"></span>
     {{ $tag->name }}
 
     @if ($removable)
-        <button type="button" {{ $attributes }} class="hover:opacity-70">
-            <x-heroicon-o-x-mark class="w-3 h-3" />
+        <button type="button" {{ $attributes }} class="transition hover:opacity-70">
+            <x-heroicon-o-x-mark class="size-3" />
         </button>
     @endif
 </span>

@@ -35,3 +35,15 @@ test('a trashed task can be permanently deleted', function () {
 
     expect(Task::withTrashed()->find($task->id))->toBeNull();
 });
+
+test('a trashed task in a trashed project cannot be restored on its own', function () {
+    $task = Task::factory()->create();
+    $task->delete();
+    $task->project->delete();
+
+    Livewire::test('pages::trash')
+        ->assertSee('Restore its project first')
+        ->call('restoreTask', $task->id);
+
+    expect(Task::find($task->id))->toBeNull();
+});

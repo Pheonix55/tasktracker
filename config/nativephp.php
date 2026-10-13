@@ -178,7 +178,7 @@ return [
      * @see https://www.electron.build/generated/nsisoptions
      */
     'nsis' => [
-        'delete_app_data_on_uninstall' => env('NATIVEPHP_NSIS_DELETE_APP_DATA', false),
+        'delete_app_data_on_uninstall' => env('NATIVEPHP_NSIS_DELETE_APP_DATA', true),
     ],
 
     /**

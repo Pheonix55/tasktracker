@@ -2,6 +2,7 @@
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Project;
 use App\Models\Task;
 use Livewire\Livewire;
 
@@ -65,4 +66,41 @@ test('a task is overdue when its due date has passed and it is not done', functi
     expect($overdue->isOverdue)->toBeTrue();
     expect($notOverdueBecauseDone->isOverdue)->toBeFalse();
     expect($notOverdueBecauseFuture->isOverdue)->toBeFalse();
+});
+
+test('a task due today is not overdue and is overdue once the day has passed', function () {
+    $this->travelTo(now()->setTime(15, 0));
+
+    $task = Task::factory()->create(['due_date' => today(), 'status' => TaskStatus::Todo]);
+
+    expect($task->fresh()->isOverdue)->toBeFalse();
+
+    $this->travel(1)->days();
+
+    expect($task->fresh()->isOverdue)->toBeTrue();
+});
+
+test('changing a task status in the detail modal moves it to the bottom of the new column', function () {
+    $project = Project::factory()->create();
+    Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::InProgress, 'position' => 0]);
+    Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::InProgress, 'position' => 1]);
+    $task = Task::factory()->create(['project_id' => $project->id, 'status' => TaskStatus::Todo, 'position' => 0]);
+
+    Livewire::test('tasks.detail-modal')
+        ->call('open', $task->id)
+        ->set('status', TaskStatus::InProgress->value)
+        ->call('save');
+
+    expect($task->fresh())->status->toBe(TaskStatus::InProgress)->position->toBe(2);
+});
+
+test('saving the detail modal without changing status keeps the task position', function () {
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'position' => 3]);
+
+    Livewire::test('tasks.detail-modal')
+        ->call('open', $task->id)
+        ->set('title', 'Renamed')
+        ->call('save');
+
+    expect($task->fresh()->position)->toBe(3);
 });

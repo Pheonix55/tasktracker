@@ -5,7 +5,9 @@ use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Tag;
 use App\Models\Task;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -67,8 +69,21 @@ class extends Component
     #[Computed]
     public function tasksByStatus()
     {
-        $query = $this->project->tasks()->with(['tags', 'checklistItems'])->orderBy('position');
+        return $this->applyBoardFilters($this->project->tasks())
+            ->with(['tags', 'checklistItems'])
+            ->orderBy('position')
+            ->get()
+            ->groupBy(fn (Task $task) => $task->status->value);
+    }
 
+    /**
+     * Restrict a task query to the tags and priorities currently selected on the board.
+     *
+     * @param  HasMany<Task, Project>  $query
+     * @return HasMany<Task, Project>
+     */
+    private function applyBoardFilters(HasMany $query): HasMany
+    {
         if (! empty($this->tagFilter)) {
             $query->whereHas('tags', fn ($q) => $q->whereIn('tags.id', $this->tagFilter));
         }
@@ -77,7 +92,7 @@ class extends Component
             $query->whereIn('priority', $this->priorityFilter);
         }
 
-        return $query->get()->groupBy(fn (Task $task) => $task->status->value);
+        return $query;
     }
 
     #[Computed]
@@ -165,41 +180,86 @@ class extends Component
             ->all();
     }
 
+    /**
+     * Move a dropped task into its destination column. `$position` is the drop index
+     * among the cards currently visible, which differs from the full column order
+     * while a tag or priority filter hides some tasks.
+     */
     public function handleSort(int $id, int $position, string $status): void
     {
         $status = TaskStatus::from($status);
         $task = $this->project->tasks()->findOrFail($id);
 
-        $task->update([
-            'status' => $status,
-            'position' => $position,
-            'completed_at' => $status === TaskStatus::Done ? ($task->completed_at ?? now()) : null,
-        ]);
+        DB::transaction(function () use ($task, $position, $status): void {
+            $siblings = $this->project->tasks()
+                ->where('status', $status)
+                ->whereKeyNot($task->id)
+                ->orderBy('position')
+                ->get();
 
-        // Re-sequence siblings in the destination column so positions stay contiguous.
-        $siblings = $this->project->tasks()
-            ->where('status', $status)
-            ->where('id', '!=', $task->id)
-            ->orderBy('position')
-            ->get();
+            $ordered = $siblings->values();
+            $ordered->splice($this->fullColumnIndex($siblings, $position, $status), 0, [$task]);
 
-        $index = 0;
-
-        foreach ($siblings as $sibling) {
-            if ($index === $position) {
-                $index++;
+            foreach ($ordered as $index => $item) {
+                if ($item->is($task)) {
+                    $task->update([
+                        'status' => $status,
+                        'position' => $index,
+                        'completed_at' => $status === TaskStatus::Done ? ($task->completed_at ?? now()) : null,
+                    ]);
+                } elseif ($item->position !== $index) {
+                    $item->update(['position' => $index]);
+                }
             }
-
-            $sibling->update(['position' => $index]);
-            $index++;
-        }
+        });
 
         unset($this->tasksByStatus);
+    }
+
+    /**
+     * Translate a drop index within the visible (filtered) cards of a column into an
+     * index within all of the column's tasks: the dropped task goes just before the
+     * visible card it landed on, or just after the last visible card.
+     *
+     * @param  Collection<int, Task>  $siblings  The column's other tasks, in position order.
+     */
+    private function fullColumnIndex(Collection $siblings, int $visiblePosition, TaskStatus $status): int
+    {
+        if (empty($this->tagFilter) && empty($this->priorityFilter)) {
+            return min($visiblePosition, $siblings->count());
+        }
+
+        $visibleIds = $this->applyBoardFilters($this->project->tasks())
+            ->where('status', $status)
+            ->whereKey($siblings->pluck('id'))
+            ->orderBy('position')
+            ->pluck('id');
+
+        if ($visibleIds->isEmpty()) {
+            return $siblings->count();
+        }
+
+        $anchorId = $visibleIds->get($visiblePosition);
+
+        if ($anchorId !== null) {
+            return $siblings->search(fn (Task $sibling): bool => $sibling->id === $anchorId);
+        }
+
+        return $siblings->search(fn (Task $sibling): bool => $sibling->id === $visibleIds->last()) + 1;
     }
 
     #[On('task-updated')]
     public function refreshBoard(): void
     {
         unset($this->tasksByStatus);
+    }
+
+    /**
+     * Pick up edits made in the project form modal so the header isn't stale.
+     */
+    #[On('project-saved')]
+    public function refreshProject(): void
+    {
+        $this->project->refresh();
     }
 };

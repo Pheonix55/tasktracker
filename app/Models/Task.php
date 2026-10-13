@@ -82,14 +82,15 @@ class Task extends Model
     }
 
     /**
-     * Whether the task is overdue: has a due date in the past and isn't done.
+     * Whether the task is overdue: has a due date before today and isn't done.
+     * A task due today is not overdue until the day has passed.
      *
      * @return Attribute<bool, never>
      */
     protected function isOverdue(): Attribute
     {
         return Attribute::get(fn (): bool => $this->due_date !== null
-            && $this->due_date->isPast()
+            && $this->due_date->lt(today())
             && $this->status !== TaskStatus::Done
         );
     }

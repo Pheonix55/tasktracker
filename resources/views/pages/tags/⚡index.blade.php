@@ -84,75 +84,114 @@ new #[Layout('layouts::app')] #[Title('Tags')] class extends Component
 };
 ?>
 
-<div class="space-y-6 max-w-2xl">
-    <div>
-        <h1 class="text-xl font-semibold">Tags</h1>
-        <p class="text-sm text-[#706f6c] dark:text-[#A1A09A] mt-1">Organize tasks across every project with reusable labels.</p>
-    </div>
+<div class="max-w-3xl space-y-6">
+    <x-ui.page-header
+        title="Tags"
+        description="Organize tasks across every project with reusable labels."
+        icon="tag"
+        gradient="from-fuchsia-500 to-pink-500 shadow-fuchsia-500/30"
+    />
 
-    <form wire:submit="create" class="flex items-end gap-3">
-        <div class="flex-1">
-            <label class="block text-sm font-medium mb-1" for="new-tag-name">New tag</label>
-            <input
-                id="new-tag-name"
-                type="text"
-                wire:model="newTagName"
-                placeholder="e.g. Bug"
-                class="w-full rounded-md border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53003]/40"
-            >
-            @error('newTagName') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+    <form wire:submit="create" class="card space-y-4 p-5">
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="min-w-[200px] flex-1">
+                <label class="field-label" for="new-tag-name">New tag</label>
+                <div class="relative">
+                    <span class="absolute top-1/2 left-3.5 size-3 -translate-y-1/2 rounded-full transition-colors duration-300" style="background-color: {{ $newTagColor }};"></span>
+                    <input
+                        id="new-tag-name"
+                        type="text"
+                        wire:model="newTagName"
+                        placeholder="e.g. Bug"
+                        class="input-field pl-9"
+                    >
+                </div>
+            </div>
+
+            <button type="submit" wire:loading.attr="disabled" wire:target="create" class="btn-primary data-loading:opacity-70">
+                <x-heroicon-o-plus wire:loading.remove wire:target="create" class="size-4" />
+                <x-heroicon-o-arrow-path wire:loading wire:target="create" class="size-4 animate-spin" />
+                Add
+            </button>
         </div>
+        @error('newTagName') <p class="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><x-heroicon-m-exclamation-circle class="size-3.5" />{{ $message }}</p> @enderror
 
-        <div class="flex gap-1.5 pb-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-muted mr-1 text-xs font-medium">Color</span>
             @foreach ($palette as $swatch)
                 <button
                     type="button"
                     wire:click="$set('newTagColor', '{{ $swatch }}')"
-                    class="w-6 h-6 rounded-full data-loading:opacity-40 {{ $newTagColor === $swatch ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#0a0a0a] ring-current' : '' }}"
+                    aria-label="Use color {{ $swatch }}"
+                    @class([
+                        'flex size-7 items-center justify-center rounded-full text-white shadow-sm transition-all duration-200 hover:scale-110 data-loading:opacity-40',
+                        'scale-110 ring-2 ring-zinc-900/80 ring-offset-2 ring-offset-white dark:ring-white/80 dark:ring-offset-zinc-900' => $newTagColor === $swatch,
+                    ])
                     style="background-color: {{ $swatch }};"
-                ></button>
+                >
+                    @if ($newTagColor === $swatch)
+                        <x-heroicon-m-check class="size-4" />
+                    @endif
+                </button>
             @endforeach
         </div>
-
-        <button type="submit" wire:loading.attr="disabled" wire:target="create" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm bg-[#1b1b18] dark:bg-[#eeeeec] text-white dark:text-[#1C1C1A] hover:bg-black dark:hover:bg-white data-loading:opacity-70">
-            <x-heroicon-o-arrow-path wire:loading wire:target="create" class="w-4 h-4 animate-spin" />
-            Add
-        </button>
     </form>
 
-    <ul class="divide-y divide-[#e3e3e0] dark:divide-[#3E3E3A] rounded-lg border border-[#e3e3e0] dark:border-[#3E3E3A]">
-        @forelse ($this->tags as $tag)
-            <li wire:key="tag-{{ $tag->id }}" class="p-3 flex items-center gap-3">
-                @if ($editingTagId === $tag->id)
-                    <form wire:submit="update" class="flex items-center gap-2 flex-1">
-                        <div class="flex gap-1">
-                            @foreach ($palette as $swatch)
-                                <button
-                                    type="button"
-                                    wire:click="$set('editingColor', '{{ $swatch }}')"
-                                    class="w-5 h-5 rounded-full data-loading:opacity-40 {{ $editingColor === $swatch ? 'ring-2 ring-offset-1 ring-current' : '' }}"
-                                    style="background-color: {{ $swatch }};"
-                                ></button>
-                            @endforeach
+    <div class="card overflow-hidden">
+        <ul class="divide-y divide-zinc-100 dark:divide-white/5">
+            @forelse ($this->tags as $tag)
+                <li
+                    wire:key="tag-{{ $tag->id }}"
+                    class="group flex animate-fade-in-up items-center gap-3 px-5 py-3.5 transition hover:bg-zinc-50/80 dark:hover:bg-white/[0.03]"
+                    style="animation-delay: {{ min($loop->index, 12) * 40 }}ms;"
+                >
+                    @if ($editingTagId === $tag->id)
+                        <form wire:submit="update" class="flex flex-1 flex-wrap items-center gap-3">
+                            <div class="flex gap-1.5">
+                                @foreach ($palette as $swatch)
+                                    <button
+                                        type="button"
+                                        wire:click="$set('editingColor', '{{ $swatch }}')"
+                                        aria-label="Use color {{ $swatch }}"
+                                        @class([
+                                            'size-5 rounded-full transition-transform duration-200 hover:scale-125 data-loading:opacity-40',
+                                            'scale-110 ring-2 ring-zinc-900/80 ring-offset-1 ring-offset-white dark:ring-white/80 dark:ring-offset-zinc-900' => $editingColor === $swatch,
+                                        ])
+                                        style="background-color: {{ $swatch }};"
+                                    ></button>
+                                @endforeach
+                            </div>
+                            <input type="text" wire:model="editingName" class="input-field min-w-[140px] flex-1 py-1.5">
+                            <div class="flex items-center gap-1">
+                                <button type="submit" wire:loading.attr="disabled" wire:target="update" aria-label="Save tag" class="btn-icon size-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 data-loading:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
+                                    <x-heroicon-o-check class="size-4" />
+                                </button>
+                                <button type="button" wire:click="cancelEdit" aria-label="Cancel editing" class="btn-icon size-8 data-loading:opacity-50">
+                                    <x-heroicon-o-x-mark class="size-4" />
+                                </button>
+                            </div>
+                        </form>
+                    @else
+                        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110" style="background-color: {{ $tag->color }}1f; color: {{ $tag->color }};">
+                            <x-heroicon-s-tag class="size-4" />
+                        </span>
+                        <span class="flex-1 text-sm font-medium">{{ $tag->name }}</span>
+                        <span class="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 tabular-nums dark:bg-white/10 dark:text-zinc-300">{{ $tag->tasks_count }} {{ $tag->tasks_count === 1 ? 'task' : 'tasks' }}</span>
+                        <div class="flex items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
+                            <button type="button" wire:click="edit({{ $tag->id }})" aria-label="Edit tag" title="Edit" class="btn-icon size-8 data-loading:pointer-events-none data-loading:opacity-50">
+                                <x-heroicon-o-pencil-square class="size-4" />
+                            </button>
+                            <button type="button" wire:click="delete({{ $tag->id }})" wire:confirm="Delete this tag? It will be removed from all tasks." aria-label="Delete tag" title="Delete" class="btn-icon size-8 hover:bg-red-50 hover:text-red-600 data-loading:pointer-events-none data-loading:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-400">
+                                <x-heroicon-o-trash class="size-4" />
+                            </button>
                         </div>
-                        <input type="text" wire:model="editingName" class="flex-1 rounded-md border border-[#e3e3e0] dark:border-[#3E3E3A] bg-transparent px-2 py-1 text-sm">
-                        <button type="submit" wire:loading.attr="disabled" wire:target="update" class="text-sm text-emerald-600 dark:text-emerald-400 data-loading:opacity-50">Save</button>
-                        <button type="button" wire:click="cancelEdit" class="text-sm text-[#a1a09a] data-loading:opacity-50">Cancel</button>
-                    </form>
-                @else
-                    <span class="w-3 h-3 rounded-full shrink-0" style="background-color: {{ $tag->color }};"></span>
-                    <span class="flex-1 text-sm font-medium">{{ $tag->name }}</span>
-                    <span class="text-xs text-[#a1a09a]">{{ $tag->tasks_count }} {{ $tag->tasks_count === 1 ? 'task' : 'tasks' }}</span>
-                    <button type="button" wire:click="edit({{ $tag->id }})" class="p-1.5 rounded-md text-[#706f6c] dark:text-[#A1A09A] hover:bg-[#f5f5f4] dark:hover:bg-[#1b1b1a] data-loading:opacity-50 data-loading:pointer-events-none">
-                        <x-heroicon-o-pencil-square class="w-4 h-4" />
-                    </button>
-                    <button type="button" wire:click="delete({{ $tag->id }})" wire:confirm="Delete this tag? It will be removed from all tasks." class="p-1.5 rounded-md text-red-600 dark:text-red-400 hover:bg-[#f5f5f4] dark:hover:bg-[#1b1b1a] data-loading:opacity-50 data-loading:pointer-events-none">
-                        <x-heroicon-o-trash class="w-4 h-4" />
-                    </button>
-                @endif
-            </li>
-        @empty
-            <li class="p-6 text-center text-sm text-[#a1a09a]">No tags yet.</li>
-        @endforelse
-    </ul>
+                    @endif
+                </li>
+            @empty
+                <li>
+                    <x-ui.empty-state icon="tag" title="No tags yet." description="Create one above to start labelling tasks." />
+                </li>
+            @endforelse
+        </ul>
+    </div>
 </div>

@@ -102,9 +102,11 @@ new class extends Component
 ?>
 
 <div>
-    <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-semibold flex items-center gap-2">
-            <x-heroicon-o-rectangle-stack class="w-4 h-4" />
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="flex items-center gap-2.5 text-sm font-semibold">
+            <span class="flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                <x-heroicon-o-pencil class="size-4" />
+            </span>
             Sticky Notes
         </h2>
 
@@ -114,9 +116,10 @@ new class extends Component
                 wire:click="addNote"
                 wire:loading.attr="disabled"
                 wire:target="addNote"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border border-[#e3e3e0] dark:border-[#3E3E3A] text-[#706f6c] dark:text-[#A1A09A] hover:text-current data-loading:opacity-50"
+                class="btn-secondary px-3 py-1.5 text-xs data-loading:opacity-50"
             >
-                <x-heroicon-o-plus class="w-3.5 h-3.5" />
+                <x-heroicon-o-plus wire:loading.remove wire:target="addNote" class="size-3.5" />
+                <x-heroicon-o-arrow-path wire:loading wire:target="addNote" class="size-3.5 animate-spin" />
                 Note
             </button>
 
@@ -126,19 +129,21 @@ new class extends Component
                 wire:loading.attr="disabled"
                 wire:target="addGeneralNote"
                 title="General notes appear on every project's board"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border border-[#e3e3e0] dark:border-[#3E3E3A] text-[#706f6c] dark:text-[#A1A09A] hover:text-current data-loading:opacity-50"
+                class="btn-secondary px-3 py-1.5 text-xs data-loading:opacity-50"
             >
-                <x-heroicon-o-globe-alt class="w-3.5 h-3.5" />
+                <x-heroicon-o-globe-alt wire:loading.remove wire:target="addGeneralNote" class="size-3.5" />
+                <x-heroicon-o-arrow-path wire:loading wire:target="addGeneralNote" class="size-3.5 animate-spin" />
                 General Note
             </button>
         </div>
     </div>
 
-    <div class="relative w-full min-h-[220px] rounded-lg border border-dashed border-[#e3e3e0] dark:border-[#3E3E3A] bg-[#f5f5f4] dark:bg-[#111110] p-2">
+    <div class="relative min-h-[260px] w-full rounded-2xl border border-dashed border-zinc-300 bg-zinc-100/50 bg-[radial-gradient(circle,rgb(0_0_0/0.07)_1px,transparent_1px)] [background-size:18px_18px] p-2 dark:border-white/10 dark:bg-white/[0.02] dark:bg-[radial-gradient(circle,rgb(255_255_255/0.06)_1px,transparent_1px)]">
         @if ($this->notes->isEmpty())
-            <p class="absolute inset-0 flex items-center justify-center text-xs text-[#a1a09a]">
-                No notes yet — add one above.
-            </p>
+            <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-zinc-400">
+                <x-heroicon-o-document-plus class="size-8" />
+                <p class="text-xs">No notes yet — add one above.</p>
+            </div>
         @endif
 
         @foreach ($this->notes as $note)
@@ -172,20 +177,23 @@ new class extends Component
                 x-on:pointerdown="startDrag($event)"
                 x-on:pointermove.window="onDrag($event)"
                 x-on:pointerup.window="endDrag($event)"
-                x-bind:style="'transform: translate(' + x + 'px, ' + y + 'px); background-color: {{ $note->color }}; z-index: ' + (dragging ? 30 : {{ $note->is_pinned ? 20 : 10 }}) + ';'"
-                x-bind:class="dragging ? 'shadow-xl scale-[1.03]' : 'shadow-md'"
-                class="absolute top-0 left-0 w-48 rounded-md p-3 cursor-grab active:cursor-grabbing select-none touch-none transition-shadow
-                    {{ $note->is_pinned ? 'ring-2 ring-amber-500' : '' }}
-                    {{ $note->project_id === null ? 'border-2 border-dashed border-slate-600/40' : '' }}"
+                x-bind:style="'transform: translate(' + x + 'px, ' + y + 'px) rotate(' + (dragging ? 0 : {{ ($note->id % 5) - 2 }} * 0.6) + 'deg); background-color: {{ $note->color }}; z-index: ' + (dragging ? 30 : {{ $note->is_pinned ? 20 : 10 }}) + ';'"
+                x-bind:class="dragging ? 'shadow-2xl shadow-zinc-900/25 scale-[1.04]' : 'shadow-lg shadow-zinc-900/10 hover:shadow-xl'"
+                class="absolute top-0 left-0 w-52 cursor-grab touch-none rounded-xl p-3 transition-[box-shadow,scale] duration-200 select-none active:cursor-grabbing
+                    {{ $note->is_pinned ? 'ring-2 ring-amber-500/80' : 'ring-1 ring-black/5' }}
+                    {{ $note->project_id === null ? 'outline-2 outline-offset-[-6px] outline-dashed outline-slate-700/25' : '' }}"
             >
-                <div class="flex items-start justify-between gap-1 mb-1">
+                <div class="mb-1 flex items-start justify-between gap-1">
                     @if ($note->project_id === null)
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-700/70">General</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-700/80 uppercase">
+                            <x-heroicon-m-globe-alt class="size-3" />
+                            General
+                        </span>
                     @else
                         <span></span>
                     @endif
 
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-0.5">
                         <button
                             type="button"
                             wire:click="togglePin({{ $note->id }})"
@@ -193,12 +201,12 @@ new class extends Component
                             wire:target="togglePin({{ $note->id }})"
                             x-on:pointerdown.stop
                             title="{{ $note->is_pinned ? 'Unpin' : 'Pin' }}"
-                            class="text-slate-700/60 hover:text-slate-900 data-loading:opacity-50"
+                            class="rounded-md p-1 text-slate-700/60 transition hover:bg-black/5 hover:text-slate-900 data-loading:opacity-50"
                         >
                             @if ($note->is_pinned)
-                                <x-heroicon-s-bookmark class="w-3.5 h-3.5" />
+                                <x-heroicon-s-bookmark class="size-3.5" />
                             @else
-                                <x-heroicon-o-bookmark class="w-3.5 h-3.5" />
+                                <x-heroicon-o-bookmark class="size-3.5" />
                             @endif
                         </button>
 
@@ -209,9 +217,9 @@ new class extends Component
                             wire:target="delete({{ $note->id }})"
                             x-on:pointerdown.stop
                             title="Delete note"
-                            class="text-slate-700/60 hover:text-red-600 data-loading:opacity-50"
+                            class="rounded-md p-1 text-slate-700/60 transition hover:bg-black/5 hover:text-red-600 data-loading:opacity-50"
                         >
-                            <x-heroicon-o-x-mark class="w-3.5 h-3.5" />
+                            <x-heroicon-o-x-mark class="size-3.5" />
                         </button>
                     </div>
                 </div>
@@ -221,7 +229,7 @@ new class extends Component
                     wire:blur="updateBody({{ $note->id }}, $event.target.value)"
                     rows="4"
                     placeholder="Write a note…"
-                    class="w-full bg-transparent resize-none text-sm text-slate-800 placeholder:text-slate-800/50 focus:outline-none"
+                    class="w-full resize-none bg-transparent text-sm leading-relaxed text-slate-800 placeholder:text-slate-800/50 focus:outline-none"
                 >{{ $note->body }}</textarea>
             </div>
         @endforeach
