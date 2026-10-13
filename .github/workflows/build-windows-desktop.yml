@@ -131,23 +131,40 @@ jobs:
         run: npm ci
 
       - name: Install NativePHP resources
-        run: php artisan native:install --force --quiet
+        run: php artisan native:install --force --no-interaction
 
       - name: Build frontend assets
         run: npm run build
 
+      # NativePHP ignores the exit codes of the npm / electron-builder processes it runs,
+      # so a failed build still exits 0. Fail here when nothing was produced, and repeat
+      # the error lines so they don't have to be dug out of the full log.
       - name: Publish Windows desktop app
         if: ${{ inputs.publish }}
+        shell: bash
         env:
           DEBUG: electron-builder
           # electron-builder reads GH_TOKEN first; publishing needs the write token.
           GH_TOKEN: ${{ secrets.GH_UPDATER_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_UPDATER_TOKEN }}
-        run: php artisan native:publish win x64 --no-interaction
+        run: |
+          php artisan native:publish win x64 --no-interaction 2>&1 | tee native-build.log
+          if [ ! -d nativephp/electron/dist ]; then
+            echo "::error::native:publish produced no output in nativephp/electron/dist. Error lines from the log:"
+            grep -inE "error|err!|failed|cannot|not found|exited with" native-build.log | tail -n 40
+            exit 1
+          fi
 
       - name: Build Windows desktop app
         if: ${{ !inputs.publish }}
-        run: php artisan native:build win x64 --no-interaction
+        shell: bash
+        run: |
+          php artisan native:build win x64 --no-interaction 2>&1 | tee native-build.log
+          if [ ! -d nativephp/electron/dist ]; then
+            echo "::error::native:build produced no output in nativephp/electron/dist. Error lines from the log:"
+            grep -inE "error|err!|failed|cannot|not found|exited with" native-build.log | tail -n 40
+            exit 1
+          fi
 
       # native:publish uploads the installer straight to the release, so there is nothing local to upload.
       - name: Locate build output
